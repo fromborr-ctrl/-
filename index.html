@@ -1,1 +1,212 @@
-<!-- Temporary file for activating repository -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Corkboard</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: url('corkboard-bg.png');
+      background-size: cover;
+    }
+    .toolbar {
+      padding: 10px;
+      background: #8b6f47;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+    }
+    #board {
+      display: flex;
+      flex-wrap: wrap;
+      padding: 10px;
+      gap: 10px;
+      justify-content: center;
+    }
+    .card {
+      background: #fffb96;
+      border: 1px solid #e0c760;
+      width: 90%;
+      max-width: 220px;
+      min-height: 150px;
+      padding: 10px;
+      box-shadow: 4px 4px 6px rgba(0,0,0,0.2);
+      cursor: grab;
+      position: relative;
+      border-radius: 8px;
+    }
+    .card textarea {
+      width: 100%;
+      height: 100px;
+      resize: none;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .card button {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .card-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+      cursor: pointer;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border: 2px solid #888;
+      z-index: 999;
+    }
+    .modal textarea {
+      width: 300px;
+      height: 200px;
+    }
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 998;
+    }
+    @media (max-width: 600px) {
+      .card {
+        width: 95%;
+        font-size: 16px;
+      }
+      .modal textarea {
+        width: 90vw;
+        height: 40vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <span><b>Corkboard</b></span>
+    <button onclick="addCard()">+ Add Card</button>
+  </div>
+  <div id="board"></div>
+
+  <div class="overlay" id="overlay" onclick="closeModal()"></div>
+  <div class="modal" id="modal">
+    <h3>Card Detail</h3>
+    <textarea id="modalText"></textarea><br />
+    <button onclick="saveDetail()">Save</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script>
+    let cards = JSON.parse(localStorage.getItem("cards")) || [];
+    let currentEditingIndex = null;
+
+    const board = document.getElementById("board");
+
+    function saveToStorage() {
+      localStorage.setItem("cards", JSON.stringify(cards));
+    }
+
+    function renderCards() {
+      board.innerHTML = "";
+      cards.forEach((card, index) => {
+        const div = document.createElement("div");
+        div.className = "card";
+
+        const title = document.createElement("div");
+        title.className = "card-title";
+        title.innerText = `Card ${index + 1}`;
+        title.onclick = () => openModal(index);
+
+        const textarea = document.createElement("textarea");
+        textarea.value = card.text;
+        textarea.onchange = (e) => {
+          cards[index].text = e.target.value;
+          saveToStorage();
+        };
+
+        const delBtn = document.createElement("button");
+        delBtn.innerText = "×";
+        delBtn.onclick = () => {
+          cards.splice(index, 1);
+          saveToStorage();
+          renderCards();
+        };
+
+        div.appendChild(delBtn);
+        div.appendChild(title);
+        div.appendChild(textarea);
+        board.appendChild(div);
+      });
+    }
+
+    function updateCardTitles() {
+      cards.forEach((card, index) => {
+        card.title = `Card ${index + 1}`;
+      });
+      saveToStorage();
+    }
+
+    function addCard() {
+      const newCard = { title: `Card ${cards.length + 1}`, text: "" };
+      cards.push(newCard);
+      saveToStorage();
+      renderCards();
+    }
+
+    function openModal(index) {
+      currentEditingIndex = index;
+      document.getElementById("modalText").value = cards[index].text;
+      document.getElementById("modal").style.display = "block";
+      document.getElementById("overlay").style.display = "block";
+    }
+
+    function closeModal() {
+      document.getElementById("modal").style.display = "none";
+      document.getElementById("overlay").style.display = "none";
+    }
+
+    function saveDetail() {
+      cards[currentEditingIndex].text = document.getElementById("modalText").value;
+      saveToStorage();
+      renderCards();
+      closeModal();
+    }
+
+    renderCards();
+
+    Sortable.create(board, {
+      animation: 150,
+      onEnd: function (evt) {
+        const item = cards.splice(evt.oldIndex, 1)[0];
+        cards.splice(evt.newIndex, 0, item);
+        updateCardTitles();
+        renderCards();
+      }
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log('Service Worker registered'))
+        .catch(err => console.error('SW registration failed:', err));
+    }
+  </script>
+</body>
+</html>
