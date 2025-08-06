@@ -1,15 +1,15 @@
 {
-  "name": "My Corkboard",
+  "name": "Corkboard",
   "short_name": "Corkboard",
-  "start_url": "./index.html",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#8b6f47",
+  "description": "아이디어를 위한 코르크보드",
   "icons": [
     {
       "src": "icon.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "sizes": "192x192"
     }
   ]
 }

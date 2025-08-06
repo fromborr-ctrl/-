@@ -1,19 +1,12 @@
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open('corkboard-cache').then(cache => {
-      return cache.addAll([
-        './index.html',
-        './manifest.json',
-        './icon.png'
-      ]);
-    })
-  );
+  console.log('Service Worker installing.');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  console.log('Service Worker activating.');
 });
 
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
-    })
-  );
+  event.respondWith(fetch(event.request));
 });
