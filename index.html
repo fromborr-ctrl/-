@@ -1,212 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mini Corkboard</title>
-  <link rel="manifest" href="manifest.json">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Corkboard</title>
   <style>
     body {
-      margin: 0;
       font-family: sans-serif;
-      background: url('corkboard-bg.png');
-      background-size: cover;
+      margin: 0;
+      padding: 0;
+      background: #f7f7f7;
     }
-    .toolbar {
-      padding: 10px;
-      background: #8b6f47;
-      color: white;
-      display: flex;
-      justify-content: space-between;
+    h1 {
+      text-align: center;
+      margin-top: 20px;
     }
     #board {
       display: flex;
       flex-wrap: wrap;
-      padding: 10px;
+      padding: 20px;
       gap: 10px;
       justify-content: center;
     }
     .card {
-      background: #fffb96;
-      border: 1px solid #e0c760;
-      width: 90%;
-      max-width: 220px;
-      min-height: 150px;
-      padding: 10px;
-      box-shadow: 4px 4px 6px rgba(0,0,0,0.2);
-      cursor: grab;
-      position: relative;
-      border-radius: 8px;
-    }
-    .card textarea {
-      width: 100%;
-      height: 100px;
-      resize: none;
-      border: none;
-      background: transparent;
-      font-size: 14px;
-      font-family: inherit;
-    }
-    .card button {
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      background: red;
-      color: white;
-      border: none;
-      border-radius: 3px;
-      cursor: pointer;
-    }
-    .card-title {
-      font-weight: bold;
-      margin-bottom: 5px;
-      cursor: pointer;
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
       background: white;
-      padding: 20px;
-      border: 2px solid #888;
-      z-index: 999;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      width: 200px;
+      min-height: 100px;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+      cursor: grab;
     }
-    .modal textarea {
-      width: 300px;
-      height: 200px;
+    .folder {
+      background: #e0eaff;
+      border: 2px dashed #007bff;
     }
-    .overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.5);
-      z-index: 998;
+    .card[draggable="true"] {
+      user-select: none;
     }
-    @media (max-width: 600px) {
-      .card {
-        width: 95%;
-        font-size: 16px;
-      }
-      .modal textarea {
-        width: 90vw;
-        height: 40vh;
-      }
+    .card:hover {
+      background: #f0f8ff;
+    }
+    #newCard {
+      display: block;
+      margin: 20px auto;
+      padding: 10px 20px;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
-  <div class="toolbar">
-    <span><b>Corkboard</b></span>
-    <button onclick="addCard()">+ Add Card</button>
-  </div>
+  <h1>Corkboard 📌</h1>
+  <button id="newCard">➕ 새 카드 추가</button>
   <div id="board"></div>
 
-  <div class="overlay" id="overlay" onclick="closeModal()"></div>
-  <div class="modal" id="modal">
-    <h3>Card Detail</h3>
-    <textarea id="modalText"></textarea><br />
-    <button onclick="saveDetail()">Save</button>
-  </div>
+  <!-- Firebase -->
+  <script type="module">
+    // Firebase SDK import
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
 
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script>
-    let cards = JSON.parse(localStorage.getItem("cards")) || [];
-    let currentEditingIndex = null;
+    const firebaseConfig = {
+      apiKey: "AIzaSyB55FLGruyHNwxhI1LFEjxuiN9AYVS4JTY",
+      authDomain: "corkboard-588ee.firebaseapp.com",
+      projectId: "corkboard-588ee",
+      storageBucket: "corkboard-588ee.appspot.com",
+      messagingSenderId: "396106577962",
+      appId: "1:396106577962:web:6ef0c17097d58e7cc02b53"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-    const board = document.getElementById("board");
+    const board = document.getElementById('board');
+    const newCardBtn = document.getElementById('newCard');
 
-    function saveToStorage() {
-      localStorage.setItem("cards", JSON.stringify(cards));
-    }
+    // 드래그 상태 변수
+    let dragged = null;
 
-    function renderCards() {
-      board.innerHTML = "";
-      cards.forEach((card, index) => {
-        const div = document.createElement("div");
-        div.className = "card";
+    function createCardElement(cardData, id) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.setAttribute('draggable', 'true');
+      card.textContent = cardData.content;
+      card.dataset.id = id;
+      card.dataset.folder = cardData.folder || '';
 
-        const title = document.createElement("div");
-        title.className = "card-title";
-        title.innerText = `Card ${index + 1}`;
-        title.onclick = () => openModal(index);
-
-        const textarea = document.createElement("textarea");
-        textarea.value = card.text;
-        textarea.onchange = (e) => {
-          cards[index].text = e.target.value;
-          saveToStorage();
-        };
-
-        const delBtn = document.createElement("button");
-        delBtn.innerText = "×";
-        delBtn.onclick = () => {
-          cards.splice(index, 1);
-          saveToStorage();
-          renderCards();
-        };
-
-        div.appendChild(delBtn);
-        div.appendChild(title);
-        div.appendChild(textarea);
-        board.appendChild(div);
+      card.addEventListener('dragstart', (e) => {
+        dragged = card;
       });
-    }
 
-    function updateCardTitles() {
-      cards.forEach((card, index) => {
-        card.title = `Card ${index + 1}`;
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
       });
-      saveToStorage();
+
+      card.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        if (dragged && dragged !== card) {
+          const folderId = card.dataset.id;
+          const draggedId = dragged.dataset.id;
+
+          // 폴더화
+          await updateDoc(doc(db, "card", draggedId), {
+            folder: folderId
+          });
+        }
+      });
+
+      card.addEventListener('dblclick', async () => {
+        const folderId = card.dataset.id;
+        const snapshot = await getDoc(doc(db, "card", folderId));
+        if (snapshot.exists()) {
+          const isFolder = snapshot.data().isFolder || false;
+          if (!isFolder) {
+            await updateDoc(doc(db, "card", folderId), { isFolder: true });
+          } else {
+            // 폴더 안에 있는 카드만 필터링
+            const q = collection(db, "card");
+            const allCards = await onSnapshot(q, (querySnapshot) => {
+              board.innerHTML = '';
+              querySnapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                if (data.folder === folderId) {
+                  const childCard = createCardElement(data, docSnap.id);
+                  board.appendChild(childCard);
+                }
+              });
+            });
+          }
+        }
+      });
+
+      return card;
     }
 
-    function addCard() {
-      const newCard = { title: `Card ${cards.length + 1}`, text: "" };
-      cards.push(newCard);
-      saveToStorage();
-      renderCards();
-    }
-
-    function openModal(index) {
-      currentEditingIndex = index;
-      document.getElementById("modalText").value = cards[index].text;
-      document.getElementById("modal").style.display = "block";
-      document.getElementById("overlay").style.display = "block";
-    }
-
-    function closeModal() {
-      document.getElementById("modal").style.display = "none";
-      document.getElementById("overlay").style.display = "none";
-    }
-
-    function saveDetail() {
-      cards[currentEditingIndex].text = document.getElementById("modalText").value;
-      saveToStorage();
-      renderCards();
-      closeModal();
-    }
-
-    renderCards();
-
-    Sortable.create(board, {
-      animation: 150,
-      onEnd: function (evt) {
-        const item = cards.splice(evt.oldIndex, 1)[0];
-        cards.splice(evt.newIndex, 0, item);
-        updateCardTitles();
-        renderCards();
-      }
+    // 카드 새로 만들기
+    newCardBtn.addEventListener('click', async () => {
+      const content = prompt("카드 내용을 입력하세요");
+      if (!content) return;
+      await addDoc(collection(db, "card"), {
+        content,
+        folder: '',
+        isFolder: false
+      });
     });
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(() => console.log('Service Worker registered'))
-        .catch(err => console.error('SW registration failed:', err));
-    }
+    // 카드 실시간 불러오기
+    onSnapshot(collection(db, "card"), (snapshot) => {
+      board.innerHTML = '';
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (!data.folder) {
+          const card = createCardElement(data, docSnap.id);
+          board.appendChild(card);
+        }
+      });
+    });
   </script>
 </body>
 </html>
