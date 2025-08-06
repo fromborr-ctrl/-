@@ -1,162 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Corkboard</title>
+  <script type="module" src="main.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f7f7f7;
-    }
-    h1 {
-      text-align: center;
-      margin-top: 20px;
-    }
-    #board {
-      display: flex;
-      flex-wrap: wrap;
-      padding: 20px;
-      gap: 10px;
-      justify-content: center;
-    }
-    .card {
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 10px;
-      width: 200px;
-      min-height: 100px;
-      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-      cursor: grab;
-    }
-    .folder {
-      background: #e0eaff;
-      border: 2px dashed #007bff;
-    }
-    .card[draggable="true"] {
-      user-select: none;
-    }
-    .card:hover {
-      background: #f0f8ff;
-    }
-    #newCard {
-      display: block;
-      margin: 20px auto;
-      padding: 10px 20px;
-      font-size: 16px;
-    }
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    #board { display: flex; flex-wrap: wrap; padding: 10px; }
+    .card { width: 200px; height: 100px; background: #fffae3; margin: 10px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-radius: 5px; }
   </style>
 </head>
 <body>
-  <h1>Corkboard 📌</h1>
-  <button id="newCard">➕ 새 카드 추가</button>
+  <h1>🌟 내 아이디어 보드</h1>
   <div id="board"></div>
-
-  <!-- Firebase -->
-  <script type="module">
-    // Firebase SDK import
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyB55FLGruyHNwxhI1LFEjxuiN9AYVS4JTY",
-      authDomain: "corkboard-588ee.firebaseapp.com",
-      projectId: "corkboard-588ee",
-      storageBucket: "corkboard-588ee.appspot.com",
-      messagingSenderId: "396106577962",
-      appId: "1:396106577962:web:6ef0c17097d58e7cc02b53"
-    };
-    
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    const board = document.getElementById('board');
-    const newCardBtn = document.getElementById('newCard');
-
-    // 드래그 상태 변수
-    let dragged = null;
-
-    function createCardElement(cardData, id) {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.setAttribute('draggable', 'true');
-      card.textContent = cardData.content;
-      card.dataset.id = id;
-      card.dataset.folder = cardData.folder || '';
-
-      card.addEventListener('dragstart', (e) => {
-        dragged = card;
-      });
-
-      card.addEventListener('dragover', (e) => {
-        e.preventDefault();
-      });
-
-      card.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        if (dragged && dragged !== card) {
-          const folderId = card.dataset.id;
-          const draggedId = dragged.dataset.id;
-
-          // 폴더화
-          await updateDoc(doc(db, "card", draggedId), {
-            folder: folderId
-          });
-        }
-      });
-
-      card.addEventListener('dblclick', async () => {
-        const folderId = card.dataset.id;
-        const snapshot = await getDoc(doc(db, "card", folderId));
-        if (snapshot.exists()) {
-          const isFolder = snapshot.data().isFolder || false;
-          if (!isFolder) {
-            await updateDoc(doc(db, "card", folderId), { isFolder: true });
-          } else {
-            // 폴더 안에 있는 카드만 필터링
-            const q = collection(db, "card");
-            const allCards = await onSnapshot(q, (querySnapshot) => {
-              board.innerHTML = '';
-              querySnapshot.forEach((docSnap) => {
-                const data = docSnap.data();
-                if (data.folder === folderId) {
-                  const childCard = createCardElement(data, docSnap.id);
-                  board.appendChild(childCard);
-                }
-              });
-            });
-          }
-        }
-      });
-
-      return card;
-    }
-
-    // 카드 새로 만들기
-    newCardBtn.addEventListener('click', async () => {
-      const content = prompt("카드 내용을 입력하세요");
-      if (!content) return;
-      await addDoc(collection(db, "card"), {
-        content,
-        folder: '',
-        isFolder: false
-      });
-    });
-
-    // 카드 실시간 불러오기
-    onSnapshot(collection(db, "card"), (snapshot) => {
-      board.innerHTML = '';
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (!data.folder) {
-          const card = createCardElement(data, docSnap.id);
-          board.appendChild(card);
-        }
-      });
-    });
-  </script>
+  <button onclick="createCard()">카드 추가</button>
 </body>
 </html>
