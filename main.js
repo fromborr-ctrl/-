@@ -1,101 +1,114 @@
-// ✨ 전체 코드 리팩토링: 드래그/드롭 + 자동 폴더링 + 번호 + firebase 저장 (향후 확장 가능)
+// main.js
+let board = document.getElementById("board");
+let cards = [];
+let folders = [];
+let currentView = "board"; // 'board' or folder id
 
-const board = document.getElementById("board");
 let cardCount = 0;
-let draggingCard = null;
-let dragOffsetX = 0;
-let dragOffsetY = 0;
 
-function createCard(content = "새 카드") {
+function createCard(text = "새 카드") {
   const card = document.createElement("div");
   card.className = "card";
   card.draggable = true;
-  card.style.left = Math.random() * 500 + "px";
-  card.style.top = Math.random() * 300 + "px";
-  card.style.position = "absolute";
+  card.contentEditable = true;
+  card.dataset.id = `card-${++cardCount}`;
+  card.dataset.type = "card";
+  card.innerText = text;
 
-  card.innerHTML = `<strong>#${++cardCount}</strong><br><div contenteditable="true">${content}</div>`;
-
-  // drag events
-  card.addEventListener("dragstart", (e) => {
-    draggingCard = card;
-    dragOffsetX = e.offsetX;
-    dragOffsetY = e.offsetY;
-    setTimeout(() => card.style.opacity = "0.5", 0);
-  });
-
-  card.addEventListener("dragend", (e) => {
-    card.style.opacity = "1";
-    const x = e.pageX - dragOffsetX;
-    const y = e.pageY - dragOffsetY;
-    card.style.left = `${x}px`;
-    card.style.top = `${y}px`;
-    draggingCard = null;
-
-    checkForFoldering(card);
-  });
-
-  board.appendChild(card);
+  addDragDropEvents(card);
+  cards.push(card);
+  render();
 }
 
-function checkForFoldering(card) {
-  const cards = document.querySelectorAll(".card");
-  cards.forEach((target) => {
-    if (target === card) return;
+function addDragDropEvents(el) {
+  el.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", el.dataset.id);
+  });
 
-    const rect1 = card.getBoundingClientRect();
-    const rect2 = target.getBoundingClientRect();
+  el.addEventListener("dragover", (e) => {
+    e.preventDefault();
+  });
 
-    const isOverlap = !(rect1.right < rect2.left ||
-                        rect1.left > rect2.right ||
-                        rect1.bottom < rect2.top ||
-                        rect1.top > rect2.bottom);
+  el.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData("text/plain");
+    const source = cards.find((c) => c.dataset.id === sourceId);
 
-    if (isOverlap) {
-      makeFolder([card, target]);
+    if (source && source !== el) {
+      createFolder([source, el]);
     }
   });
 }
 
-function makeFolder(cards) {
+function createFolder(contents) {
+  const folderId = `folder-${Date.now()}`;
   const folder = document.createElement("div");
   folder.className = "card folder";
-  folder.innerHTML = `<strong>📁 폴더 (${cards.length})</strong>`;
-  folder.style.position = "absolute";
-  folder.style.left = cards[0].style.left;
-  folder.style.top = cards[0].style.top;
+  folder.innerText = "폴더 열기";
+  folder.dataset.id = folderId;
+  folder.dataset.type = "folder";
+  folder.addEventListener("dblclick", () => openFolder(folderId));
 
-  cards.forEach(c => c.remove());
-  board.appendChild(folder);
+  folders.push({ id: folderId, items: contents });
+  cards = cards.filter((c) => !contents.includes(c));
+  cards.push(folder);
+  render();
 }
 
-// 초기화 버튼 연결
-window.createCard = createCard;
+function openFolder(folderId) {
+  currentView = folderId;
+  render();
+}
 
-// 스타일 추가
-const style = document.createElement('style');
-style.innerHTML = `
-  #board { position: relative; min-height: 600px; }
-  .card {
-    width: 150px;
-    height: 120px;
-    background: #fffb99;
-    padding: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    border-radius: 8px;
-    margin: 5px;
-    cursor: move;
-    position: absolute;
-  }
-  .folder {
-    background: #d0e6ff;
-  }
-  .card[contenteditable="true"]:focus {
-    outline: none;
-  }
-`;
-document.head.appendChild(style);
+function closeFolder() {
+  currentView = "board";
+  render();
+}
 
-// 테스트용 초기 카드
-createCard("처음 아이디어");
-createCard("또 다른 생각");
+function render() {
+  board.innerHTML = "";
+
+  if (currentView === "board") {
+    folders.forEach((folder) => {
+      const folderEl = document.createElement("div");
+      folderEl.className = "card folder";
+      folderEl.innerText = `#${getCardIndex(folder.id)} 폴더 열기`;
+      folderEl.dataset.id = folder.id;
+      folderEl.dataset.type = "folder";
+      folderEl.addEventListener("dblclick", () => openFolder(folder.id));
+      addDragDropEvents(folderEl);
+      board.appendChild(folderEl);
+    });
+
+    cards.forEach((card, i) => {
+      card.innerText = `#${getCardIndex(card.dataset.id)} ${card.innerText.replace(/^#\d+\s/, "")}`;
+      board.appendChild(card);
+    });
+  } else {
+    const folder = folders.find((f) => f.id === currentView);
+    const backBtn = document.createElement("button");
+    backBtn.innerText = "🔙 뒤로 가기";
+    backBtn.onclick = closeFolder;
+    board.appendChild(backBtn);
+
+    folder.items.forEach((item) => {
+      item.innerText = item.innerText.replace(/^#\d+\s/, "");
+      board.appendChild(item);
+    });
+  }
+  updateOrder();
+}
+
+function updateOrder() {
+  const all = [...folders.map(f => f.id), ...cards.map(c => c.dataset.id)];
+  all.forEach((id, idx) => {
+    const el = [...folders, ...cards].find(x => x.dataset?.id === id || x.id === id);
+    if (el?.dataset?.type === "card") {
+      el.innerText = `#${idx + 1} ${el.innerText.replace(/^#\d+\s/, "")}`;
+    } else if (el?.dataset?.type === "folder") {
+      el.innerText = `#${idx + 1} 폴더 열기`;
+    }
+  });
+}
+
+document.getElementById("addCardBtn").onclick = () => createCard();
